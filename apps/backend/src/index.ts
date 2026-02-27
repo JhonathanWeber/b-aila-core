@@ -8,7 +8,8 @@ import * as os from 'os';
 dotenv.config();
 
 const fastify: FastifyInstance = Fastify({
-    logger: true
+    logger: false,
+    disableRequestLogging: true
 });
 
 fastify.register(fastifyStatic, {

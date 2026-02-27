@@ -139,7 +139,8 @@ class BAILA_OT_send_prompt(bpy.types.Operator):
             except Exception as e:
                 print(f"B-AILA Polling error: {e}")
 
-    def sync_ui_state(self):
+    @classmethod
+    def sync_ui_state(cls):
         """Runs safely in the main Blender thread to apply the thread's results to UI."""
         status = BAILA_OT_send_prompt._status
         if status == "running":
@@ -159,7 +160,7 @@ class BAILA_OT_send_prompt(bpy.types.Operator):
                 props.ai_response = "AI: Code generated."
                 
             if code and props.auto_run:
-                self.execute_ai_code(code)
+                cls.execute_ai_code(code)
                 
         elif status == "failed":
             props.ai_response = "AI: Generation failed."
@@ -172,7 +173,8 @@ class BAILA_OT_send_prompt(bpy.types.Operator):
                     
         return None # stop syncing
 
-    def execute_ai_code(self, code):
+    @classmethod
+    def execute_ai_code(cls, code):
         """Executes Python code with error reporting."""
         try:
             # Create a localized namespace for execution
@@ -183,14 +185,15 @@ class BAILA_OT_send_prompt(bpy.types.Operator):
         except Exception as e:
             error_msg = str(e)
             print(f"B-AILA Python Error: {error_msg}")
-            self.report_error_to_backend(error_msg, code)
+            cls.report_error_to_backend(error_msg, code)
 
-    def report_error_to_backend(self, error, code):
+    @classmethod
+    def report_error_to_backend(cls, error, code):
         """Reports a execution error back to the backend for self-healing."""
         props = bpy.context.scene.baila_props
         try:
             payload = {
-                "job_id": self._job_id,
+                "job_id": cls._job_id,
                 "error": error,
                 "failed_code": code
             }
