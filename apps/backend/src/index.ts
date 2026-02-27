@@ -151,6 +151,36 @@ fastify.get('/ai/status/:id', async (request: any, reply: any) => {
     };
 });
 
+// Dashboard API: Get Recent Jobs
+fastify.get('/api/jobs', async (request: any, reply: any) => {
+    const jobs = await prisma.aIJob.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 10
+    });
+    return jobs;
+});
+
+// Dashboard API: Get Available Models
+fastify.get('/api/models', async (request: any, reply: any) => {
+    const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
+    try {
+        const response = await fetch(`${ollamaUrl}/api/tags`);
+        const data = await response.json();
+        const preferredModel = "qwen2.5-coder:1.5b";
+
+        let models = data.models || [];
+        models = models.map((m: any) => ({
+            name: m.name,
+            size: (m.size / 1024 / 1024 / 1024).toFixed(1) + 'GB',
+            isPreferred: m.name === preferredModel
+        }));
+
+        return { status: 'ok', models };
+    } catch (e) {
+        return { status: 'error', error: "Could not connect to Ollama", models: [] };
+    }
+});
+
 // History / Sessions
 fastify.get('/sessions', async (request: any, reply: any) => {
     return await prisma.chatSession.findMany({

@@ -195,6 +195,96 @@
         // Initialize lucide
         lucide.createIcons();
         showTab('overview');
+
+        // Dynamic Data Polling
+        let isPolling = false;
+        
+        async function fetchDashboardData() {
+            try {
+                // Fetch Models
+                const modelsRes = await fetch('/api/models');
+                const modelsData = await modelsRes.json();
+                
+                // Update Ollama Indicator
+                const ollamaStatus = document.getElementById('status-ollama');
+                if (modelsData.status === 'ok') {
+                    ollamaStatus.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]';
+                } else {
+                    ollamaStatus.className = 'w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]';
+                }
+
+                // Append Models to UI if viewing overview tab
+                const modelsContainer = document.getElementById('models-container');
+                if (modelsContainer && modelsData.models) {
+                    modelsContainer.innerHTML = modelsData.models.length === 0 
+                        ? '<div class="text-sm text-zinc-500 italic">No models installed</div>'
+                        : modelsData.models.map(m => `
+                        <div class="p-3 bg-zinc-900 rounded border ${m.isPreferred ? 'border-amber-500/30' : 'border-zinc-800'} flex justify-between items-center">
+                            <div class="flex flex-col">
+                                <span class="text-sm ${m.isPreferred ? 'text-amber-400 font-medium' : 'text-zinc-300'}">${m.name}</span>
+                                <span class="text-xs text-zinc-500">${m.size}</span>
+                            </div>
+                            ${m.isPreferred 
+                                ? '<span class="text-xs bg-amber-500/10 text-amber-500 px-2 py-1 rounded">Preferred</span>' 
+                                : '<span class="text-xs bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded">Installed</span>'}
+                        </div>
+                    `).join('');
+                }
+
+                // Fetch Jobs
+                const jobsRes = await fetch('/api/jobs');
+                const jobsData = await jobsRes.json();
+                
+                // Update Backend Indicator
+                const backendStatus = document.getElementById('status-backend');
+                backendStatus.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]';
+
+                // Append Logs to UI if viewing overview tab
+                const logContainer = document.getElementById('log-container');
+                if (logContainer && Array.isArray(jobsData)) {
+                    logContainer.innerHTML = jobsData.length === 0
+                        ? '<div class="text-sm text-zinc-500 italic">Waiting for requests from Blender...</div>'
+                        : jobsData.map(job => {
+                            const time = new Date(job.createdAt).toLocaleTimeString();
+                            let colorClass = 'text-zinc-400';
+                            let statusText = 'Processing...';
+                            
+                            if (job.status === 'completed') {
+                                colorClass = 'text-emerald-400';
+                                statusText = 'Generation completed.';
+                            } else if (job.status === 'failed') {
+                                colorClass = 'text-red-400';
+                                statusText = `Failed: ${job.error || 'Unknown error'}`;
+                            }
+                            
+                            return `
+                            <div class="flex gap-3 text-[13px] ${colorClass} py-1.5 border-b border-zinc-800/50 last:border-0">
+                                <span class="text-zinc-600 font-mono shrink-0">[${time}]</span>
+                                <div class="flex flex-col gap-1 w-full">
+                                    <span>Job ${job.id.split('-')[0]} - Prompt: "${job.prompt.substring(0, 50)}${job.prompt.length > 50 ? '...' : ''}"</span>
+                                    <span class="text-xs opacity-80">${statusText}</span>
+                                </div>
+                            </div>`;
+                        }).join('');
+                }
+
+            } catch (err) {
+                console.error("Failed to fetch dashboard data:", err);
+                // Set indicators to red on fetch failure
+                document.getElementById('status-backend').className = 'w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]';
+            }
+        }
+
+        // Start polling loop
+        setInterval(() => {
+            const currentTab = document.querySelector('.tab-btn.bg-zinc-800').id.replace('btn-', '');
+            if (currentTab === 'overview') {
+                fetchDashboardData();
+            }
+        }, 2000);
+        
+        // Initial fetch
+        fetchDashboardData();
     </script>
 </body>
 </html>
