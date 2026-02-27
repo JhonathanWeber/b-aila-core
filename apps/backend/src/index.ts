@@ -56,16 +56,24 @@ fastify.post('/ai/generate', async (request: any, reply: any) => {
 async function processAIJob(jobId: string, prompt: string, context: any, ollamaUrl: string) {
     try {
         console.log(`[BACKEND] Fetching available models from Ollama...`);
-        // Get first available model
         const tagsResponse = await fetch(`${ollamaUrl}/api/tags`);
         const tagsData = await tagsResponse.json();
         const models = tagsData.models || [];
 
         if (models.length === 0) {
-            throw new Error("No Ollama models installed. Open a terminal and run 'ollama run llama3.2' first.");
+            throw new Error("No Ollama models installed. The setup script should have installed 'qwen2.5-coder:1.5b'.");
         }
 
-        const modelName = models[0].name;
+        // Prefer qwen2.5-coder:1.5b, fallback to the first available model
+        const preferredModel = "qwen2.5-coder:1.5b";
+        let modelName = models[0].name;
+
+        if (models.some((m: any) => m.name === preferredModel)) {
+            modelName = preferredModel;
+        } else {
+            console.log(`[BACKEND] Preferred model '${preferredModel}' not found. Falling back to '${modelName}'.`);
+        }
+
         console.log(`[BACKEND] Using model: ${modelName}`);
 
         const systemPrompt = `You are B-AILA, a Blender AI Assistant.
