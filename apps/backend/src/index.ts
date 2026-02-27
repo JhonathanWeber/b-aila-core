@@ -19,6 +19,10 @@ fastify.register(fastifyStatic, {
 
 const prisma = new PrismaClient();
 
+// --- Global State ---
+let activeModelStr = "qwen2.5-coder:1.5b";
+let pullProgressState: Record<string, { status: string, total: number, completed: number, percent: number }> = {};
+
 // --- Types ---
 interface GenerateRequest {
     prompt: string;
@@ -66,14 +70,12 @@ async function processAIJob(jobId: string, prompt: string, context: any, ollamaU
             throw new Error("No Ollama models installed. The setup script should have installed 'qwen2.5-coder:1.5b'.");
         }
 
-        // Prefer qwen2.5-coder:1.5b, fallback to the first available model
-        const preferredModel = "qwen2.5-coder:1.5b";
         let modelName = models[0].name;
 
-        if (models.some((m: any) => m.name === preferredModel)) {
-            modelName = preferredModel;
+        if (models.some((m: any) => m.name === activeModelStr)) {
+            modelName = activeModelStr;
         } else {
-            console.log(`[BACKEND] Preferred model '${preferredModel}' not found. Falling back to '${modelName}'.`);
+            console.log(`[BACKEND] Active model '${activeModelStr}' not found in Ollama. Falling back to '${modelName}'.`);
         }
 
         console.log(`[BACKEND] Using model: ${modelName}`);
@@ -174,19 +176,104 @@ fastify.get('/api/models', async (request: any, reply: any) => {
     try {
         const response = await fetch(`${ollamaUrl}/api/tags`);
         const data = await response.json();
-        const preferredModel = "qwen2.5-coder:1.5b";
 
         let models = data.models || [];
         models = models.map((m: any) => ({
             name: m.name,
             size: (m.size / 1024 / 1024 / 1024).toFixed(1) + 'GB',
-            isPreferred: m.name === preferredModel
+            isActive: m.name === activeModelStr
         }));
 
         return { status: 'ok', models };
     } catch (e) {
         return { status: 'error', error: "Could not connect to Ollama", models: [] };
     }
+});
+
+// Advanced Model Management Endpoints
+fastify.get('/api/models/recommended', async (request: any, reply: any) => {
+    return [
+        { name: "qwen2.5-coder:1.5b", size: "936MB", description: "Fast & lightweight. Great default for basic queries.", tags: ["recommended", "fast"] },
+        { name: "qwen2.5-coder:7b", size: "4.7GB", description: "Highly capable coder. Excellent Python script generation.", tags: ["pro", "accurate"] },
+        { name: "deepseek-coder:6.7b", size: "3.8GB", description: "Strong alternative coder model.", tags: ["pro"] }
+    ];
+});
+
+fastify.post('/api/settings/model', async (request: any, reply: any) => {
+    const { model } = request.body as { model: string };
+    if (!model) return reply.status(400).send({ error: "Model name required" });
+
+    activeModelStr = model;
+    console.log(`[BACKEND] Active model set to: ${activeModelStr}`);
+    return { success: true, activeModel: activeModelStr };
+});
+
+fastify.post('/api/models/pull', async (request: any, reply: any) => {
+    const { model } = request.body as { model: string };
+    const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
+
+    if (!model) return reply.status(400).send({ error: "Model name required" });
+
+    // Initialize progress state
+    pullProgressState[model] = { status: "starting", total: 0, completed: 0, percent: 0 };
+
+    // Do not await the whole fetch, grab it and handle stream asynchronously
+    fetch(`${ollamaUrl}/api/pull`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: model, stream: true })
+    }).then(async (response) => {
+        if (!response.body) {
+            pullProgressState[model] = { status: "failed", total: 0, completed: 0, percent: 0 };
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                pullProgressState[model] = { status: "success", total: 100, completed: 100, percent: 100 };
+                break;
+            }
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\\n').filter(l => l.trim().length > 0);
+
+            for (const line of lines) {
+                try {
+                    const parsed = JSON.parse(line);
+                    if (parsed.total && parsed.completed) {
+                        const pct = Math.round((parsed.completed / parsed.total) * 100);
+                        pullProgressState[model] = {
+                            status: parsed.status,
+                            total: parsed.total,
+                            completed: parsed.completed,
+                            percent: pct
+                        };
+                    } else if (parsed.status === "success") {
+                        pullProgressState[model] = { status: "success", total: 100, completed: 100, percent: 100 };
+                    }
+                } catch (e) {
+                    // ignore chunk parse errors
+                }
+            }
+        }
+    }).catch(e => {
+        console.error("Pull failed:", e);
+        pullProgressState[model] = { status: "failed", total: 0, completed: 0, percent: 0 };
+    });
+
+    return { status: "pulling", model: model };
+});
+
+fastify.get('/api/models/pull/status', async (request: any, reply: any) => {
+    const { model } = request.query as { model?: string };
+    if (!model) {
+        return pullProgressState;
+    }
+    return pullProgressState[model] || { status: "unknown", percent: 0 };
 });
 
 // Dashboard API: Get System Performance

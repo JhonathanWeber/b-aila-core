@@ -92,10 +92,23 @@
                         <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
                             <div class="flex items-center gap-2 mb-4 px-1">
                                 <i data-lucide="server" class="w-5 h-5 text-emerald-400"></i>
-                                <h2 class="font-semibold text-sm text-zinc-300 uppercase tracking-wider">Active Models</h2>
+                                <h2 class="font-semibold text-sm text-zinc-300 uppercase tracking-wider">Model Management</h2>
                             </div>
-                            <div class="space-y-2" id="models-container">
+                            
+                            <!-- Installed Models -->
+                            <div class="mb-3 px-1">
+                                <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Installed Models</h3>
+                            </div>
+                            <div class="space-y-2 mb-6" id="models-container">
                                 <div class="text-sm text-zinc-500 italic">Analyzing models...</div>
+                            </div>
+                            
+                            <!-- Recommended Models -->
+                            <div class="mb-3 px-1">
+                                <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Recommended Models</h3>
+                            </div>
+                            <div class="space-y-2" id="recommended-models-container">
+                                <div class="text-sm text-zinc-500 italic">Gathering recommendations...</div>
                             </div>
                         </div>
                     </section>
@@ -208,20 +221,75 @@
 
                 // Append Models to UI if viewing overview tab
                 const modelsContainer = document.getElementById('models-container');
+                const recommendedContainer = document.getElementById('recommended-models-container');
+                
                 if (modelsContainer && modelsData.models) {
-                    modelsContainer.innerHTML = modelsData.models.length === 0 
+                    const sortedInstalled = modelsData.models.sort((a, b) => b.isActive ? 1 : -1);
+                    modelsContainer.innerHTML = sortedInstalled.length === 0 
                         ? '<div class="text-sm text-zinc-500 italic">No models installed</div>'
-                        : modelsData.models.map(m => `
-                        <div class="p-3 bg-zinc-900 rounded border ${m.isPreferred ? 'border-amber-500/30' : 'border-zinc-800'} flex justify-between items-center">
+                        : sortedInstalled.map(m => `
+                        <div class="p-3 bg-zinc-900 rounded border ${m.isActive ? 'border-amber-500/50' : 'border-zinc-800'} flex justify-between items-center transition-all">
                             <div class="flex flex-col">
-                                <span class="text-sm ${m.isPreferred ? 'text-amber-400 font-medium' : 'text-zinc-300'}">${m.name}</span>
+                                <span class="text-sm ${m.isActive ? 'text-amber-400 font-semibold' : 'text-zinc-300'}">${m.name}</span>
                                 <span class="text-xs text-zinc-500">${m.size}</span>
                             </div>
-                            ${m.isPreferred 
-                                ? '<span class="text-xs bg-amber-500/10 text-amber-500 px-2 py-1 rounded">Preferred</span>' 
-                                : '<span class="text-xs bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded">Installed</span>'}
+                            <div class="flex items-center gap-3">
+                                ${m.isActive 
+                                    ? '<span class="text-xs bg-amber-500/10 text-amber-500 px-2 py-1 rounded font-medium border border-amber-500/20">Active</span>' 
+                                    : `<button onclick="setActiveModel('${m.name}')" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded transition-colors cursor-pointer border border-zinc-700">Set Active</button>`}
+                            </div>
                         </div>
                     `).join('');
+                }
+
+                // Append Recommended Models
+                const recRes = await fetch('/api/models/recommended');
+                let recommendedData = [];
+                if (recRes.ok) recommendedData = await recRes.json();
+                
+                const pullStatusRes = await fetch('/api/models/pull/status');
+                let pullStatusData = {};
+                if (pullStatusRes.ok) pullStatusData = await pullStatusRes.json();
+
+                if (recommendedContainer && Array.isArray(recommendedData)) {
+                    // Filter out models that are already installed
+                    const installedNames = modelsData.models ? modelsData.models.map(m => m.name) : [];
+                    const notInstalledRecs = recommendedData.filter(r => !installedNames.includes(r.name));
+                    
+                    recommendedContainer.innerHTML = notInstalledRecs.length === 0
+                        ? '<div class="text-sm text-zinc-500 italic">All recommended models are installed.</div>'
+                        : notInstalledRecs.map(r => {
+                            const isPulling = pullStatusData[r.name] && pullStatusData[r.name].status !== 'success' && pullStatusData[r.name].status !== 'failed';
+                            const pct = isPulling ? pullStatusData[r.name].percent : 0;
+                            const statusText = isPulling ? pullStatusData[r.name].status : '';
+                            
+                            return `
+                            <div class="p-3 bg-zinc-900/50 rounded border border-zinc-800 flex flex-col gap-3">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex flex-col">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-sm font-medium text-emerald-400">${r.name}</span>
+                                            ${r.tags && r.tags.includes('recommended') ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">Top Pick</span>' : ''}
+                                        </div>
+                                        <span class="text-xs text-zinc-400 mt-0.5">${r.description}</span>
+                                        <span class="text-xs text-zinc-500 mt-1"><i data-lucide="hard-drive" class="w-3 h-3 inline mr-1"></i>${r.size}</span>
+                                    </div>
+                                    ${isPulling 
+                                        ? `<div class="text-xs font-medium text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20 w-20 text-center">${pct}%</div>` 
+                                        : `<button onclick="pullModel('${r.name}')" class="text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded transition-colors cursor-pointer shadow-sm"><i data-lucide="download" class="w-3 h-3 inline mr-1"></i>Download</button>`
+                                    }
+                                </div>
+                                ${isPulling ? `
+                                    <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                                        <div class="h-full bg-indigo-500 rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                                    </div>
+                                    <div class="text-[10px] text-zinc-500 text-right uppercase tracking-wider">${statusText}</div>
+                                ` : ''}
+                            </div>
+                        `}).join('');
+                    
+                    // Re-initialize icons for newly injected HTML
+                    if (window.lucide) window.lucide.createIcons();
                 }
 
                 // Fetch System Usage
@@ -283,6 +351,35 @@
                 console.error("Failed to fetch dashboard data:", err);
                 // Set indicators to red on fetch failure
                 document.getElementById('status-backend').className = 'w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]';
+            }
+        }
+
+        // Global Action Handlers
+        async function pullModel(modelName) {
+            try {
+                await fetch('/api/models/pull', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: modelName })
+                });
+                // Force an immediate refresh to show the progress bar
+                fetchDashboardData();
+            } catch (err) {
+                console.error("Failed to start pull:", err);
+            }
+        }
+
+        async function setActiveModel(modelName) {
+            try {
+                await fetch('/api/settings/model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: modelName })
+                });
+                // Force an immediate refresh to reflect the active badge
+                fetchDashboardData();
+            } catch (err) {
+                console.error("Failed to set active model:", err);
             }
         }
 
