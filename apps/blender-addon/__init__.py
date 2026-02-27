@@ -110,9 +110,11 @@ class BAILA_OT_send_prompt(bpy.types.Operator):
 
     def poll_job_status(self):
         """Timer callback to check job status."""
-        # Note: In timer, context is limited, get props directly from scene
-        props = bpy.context.scene.baila_props
+        # Note: In timer, context is restricted, get props directly from global data
         try:
+            scene = bpy.data.scenes[0]
+            props = scene.baila_props
+            
             response = requests.get(f"{props.api_url}/ai/status/{self._job_id}", timeout=2)
             data = response.json()
             status = data.get("status")
