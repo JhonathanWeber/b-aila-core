@@ -1,0 +1,42 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ChatSession {
+  id        String   @id @default(uuid())
+  title     String
+  blendFile String?  // Optional reference to the .blend file name
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id])
+  role      String   // 'user' or 'ai'
+  content   String
+  code      String?  // Extracted Python code
+  context   String?  // JSON snapshot of the scene
+  createdAt DateTime @default(now())
+}
+
+model AIJob {
+  id        String   @id @default(uuid())
+  status    String   // 'processing', 'completed', 'failed'
+  prompt    String
+  response  String?
+  pythonCode String?
+  error     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
