@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import * as dotenv from 'dotenv';
 import path from 'path';
 import fastifyStatic from '@fastify/static';
+import * as os from 'os';
 
 dotenv.config();
 
@@ -179,6 +180,32 @@ fastify.get('/api/models', async (request: any, reply: any) => {
     } catch (e) {
         return { status: 'error', error: "Could not connect to Ollama", models: [] };
     }
+});
+
+// Dashboard API: Get System Performance
+fastify.get('/api/system', async (request: any, reply: any) => {
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const memoryUsagePercent = (usedMem / totalMem) * 100;
+
+    const cpus = os.cpus();
+    let user = 0, nice = 0, sys = 0, idle = 0, irq = 0;
+    for (let cpu of cpus) {
+        user += cpu.times.user;
+        nice += cpu.times.nice;
+        sys += cpu.times.sys;
+        idle += cpu.times.idle;
+        irq += cpu.times.irq;
+    }
+    const total = user + nice + sys + idle + irq;
+    const active = user + nice + sys + irq;
+    const cpuUsagePercent = (active / total) * 100;
+
+    return {
+        cpuUsage: cpuUsagePercent.toFixed(1),
+        memoryUsage: memoryUsagePercent.toFixed(1)
+    };
 });
 
 // History / Sessions

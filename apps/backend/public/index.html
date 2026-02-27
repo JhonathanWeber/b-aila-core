@@ -73,17 +73,17 @@
                                 <i data-lucide="activity" class="w-5 h-5 text-indigo-400"></i>
                                 <h2 class="font-semibold text-sm text-zinc-300 uppercase tracking-wider">System Performance</h2>
                             </div>
-                            <div class="space-y-4">
+                            <div class="space-y-4" id="system-performance-container">
                                 <div class="space-y-1.5">
-                                    <div class="flex justify-between text-xs text-zinc-400"><span>CPU Usage</span><span>45%</span></div>
+                                    <div class="flex justify-between text-xs text-zinc-400"><span>CPU Usage</span><span id="sys-cpu">--%</span></div>
                                     <div class="h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                        <div class="h-full bg-indigo-500 rounded-full" style="width: 45%"></div>
+                                        <div id="sys-cpu-bar" class="h-full bg-indigo-500 rounded-full" style="width: 0%"></div>
                                     </div>
                                 </div>
                                 <div class="space-y-1.5">
-                                    <div class="flex justify-between text-xs text-zinc-400"><span>VRAM Usage</span><span>78%</span></div>
+                                    <div class="flex justify-between text-xs text-zinc-400"><span>Memory Usage</span><span id="sys-mem">--%</span></div>
                                     <div class="h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                        <div class="h-full bg-indigo-500 rounded-full" style="width: 78%"></div>
+                                        <div id="sys-mem-bar" class="h-full bg-indigo-500 rounded-full" style="width: 0%"></div>
                                     </div>
                                 </div>
                             </div>
@@ -94,15 +94,8 @@
                                 <i data-lucide="server" class="w-5 h-5 text-emerald-400"></i>
                                 <h2 class="font-semibold text-sm text-zinc-300 uppercase tracking-wider">Active Models</h2>
                             </div>
-                            <div class="space-y-2">
-                                <div class="p-3 bg-zinc-900 rounded border border-zinc-800 flex justify-between items-center">
-                                    <span>codellama:7b</span>
-                                    <span class="text-xs bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded">Active</span>
-                                </div>
-                                <div class="p-3 bg-zinc-900 rounded border border-zinc-800 flex justify-between items-center text-zinc-500">
-                                    <span>llama3:8b</span>
-                                    <button class="text-xs hover:text-white transition-colors">Load</button>
-                                </div>
+                            <div class="space-y-2" id="models-container">
+                                <div class="text-sm text-zinc-500 italic">Analyzing models...</div>
                             </div>
                         </div>
                     </section>
@@ -229,6 +222,24 @@
                                 : '<span class="text-xs bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded">Installed</span>'}
                         </div>
                     `).join('');
+                }
+
+                // Fetch System Usage
+                const sysRes = await fetch('/api/system');
+                const sysData = await sysRes.json();
+                
+                const sysCpu = document.getElementById('sys-cpu');
+                const sysCpuBar = document.getElementById('sys-cpu-bar');
+                const sysMem = document.getElementById('sys-mem');
+                const sysMemBar = document.getElementById('sys-mem-bar');
+                
+                if (sysCpu && sysData.cpuUsage) {
+                    sysCpu.innerText = sysData.cpuUsage + '%';
+                    sysCpuBar.style.width = sysData.cpuUsage + '%';
+                }
+                if (sysMem && sysData.memoryUsage) {
+                    sysMem.innerText = sysData.memoryUsage + '%';
+                    sysMemBar.style.width = sysData.memoryUsage + '%';
                 }
 
                 // Fetch Jobs
