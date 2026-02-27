@@ -1,11 +1,18 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import * as dotenv from 'dotenv';
+import path from 'path';
+import fastifyStatic from '@fastify/static';
 
 dotenv.config();
 
 const fastify: FastifyInstance = Fastify({
     logger: true
+});
+
+fastify.register(fastifyStatic, {
+    root: path.join(__dirname, '../public'),
+    prefix: '/', // serve at root
 });
 
 const prisma = new PrismaClient();
@@ -39,7 +46,7 @@ fastify.post('/ai/generate', async (request: any, reply: any) => {
 
     // Log the intended target
     console.log(`[BACKEND] Triggering generation on ${ollamaUrl}...`);
-    
+
     // In a real scenario, this would trigger an async call to Ollama
     return { job_id: job.id, status: 'processing', target: ollamaUrl };
 });

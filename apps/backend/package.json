@@ -11,6 +11,7 @@
     "prisma:push": "prisma db push"
   },
   "dependencies": {
+    "@fastify/static": "^9.0.0",
     "@prisma/client": "^5.0.0",
     "dotenv": "^16.3.1",
     "fastify": "^4.20.0"

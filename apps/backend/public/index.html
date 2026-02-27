@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B-AILA Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center p-6 border-b border-zinc-800 bg-zinc-900/30 sticky top-0 backdrop-blur-md z-10">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-indigo-600 rounded-lg">
+                <i data-lucide="layout" class="w-5 h-5 text-white"></i>
+            </div>
+            <h1 class="text-xl font-bold tracking-tight">B-AILA <span class="text-zinc-500 font-normal">Hub</span></h1>
+        </div>
+
+        <nav class="hidden md:flex bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+            <button onclick="showTab('overview')" id="btn-overview" class="tab-btn flex items-center gap-2 px-4 py-1.5 rounded-md text-sm transition-all bg-zinc-800 text-white shadow-sm">
+                <i data-lucide="activity" class="w-4 h-4"></i> Overview
+            </button>
+            <button onclick="showTab('manual')" id="btn-manual" class="tab-btn flex items-center gap-2 px-4 py-1.5 rounded-md text-sm transition-all text-zinc-500 hover:text-zinc-300">
+                <i data-lucide="book-open" class="w-4 h-4"></i> User Manual
+            </button>
+            <button onclick="showTab('docs')" id="btn-docs" class="tab-btn flex items-center gap-2 px-4 py-1.5 rounded-md text-sm transition-all text-zinc-500 hover:text-zinc-300">
+                <i data-lucide="file-text" class="w-4 h-4"></i> Developer Docs
+            </button>
+        </nav>
+
+        <div class="flex gap-3 text-xs">
+            <div class="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-full">
+                <span class="text-zinc-500 font-medium">Backend</span>
+                <div id="status-backend" class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+            </div>
+            <div class="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-full">
+                <span class="text-zinc-500 font-medium">Ollama</span>
+                <div id="status-ollama" class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+            </div>
+        </div>
+    </header>
+
+    <main id="content" class="flex-1 p-6 max-w-7xl mx-auto w-full">
+        <!-- Default Content -->
+    </main>
+
+    <footer class="p-6 border-t border-zinc-900 flex justify-between items-center text-zinc-500 text-sm">
+        <div class="flex items-center gap-2">
+            <i data-lucide="github" class="w-4 h-4"></i>
+            <span>Open Source Project by JhonDev</span>
+        </div>
+        <div class="flex gap-4">
+            <a href="https://github.com/JhonathanWeber/b-aila-installer" class="hover:text-zinc-300">View on GitHub</a>
+            <span>v0.1.0-alpha (Lite)</span>
+        </div>
+    </footer>
+
+    <script>
+        const VIEWS = {
+            overview: `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in">
+                    <section class="space-y-6">
+                        <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
+                            <div class="flex items-center gap-2 mb-4 px-1">
+                                <i data-lucide="activity" class="w-5 h-5 text-indigo-400"></i>
+                                <h2 class="font-semibold text-sm text-zinc-300 uppercase tracking-wider">System Performance</h2>
+                            </div>
+                            <div class="space-y-4">
+                                <div class="space-y-1.5">
+                                    <div class="flex justify-between text-xs text-zinc-400"><span>CPU Usage</span><span>45%</span></div>
+                                    <div class="h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                        <div class="h-full bg-indigo-500 rounded-full" style="width: 45%"></div>
+                                    </div>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <div class="flex justify-between text-xs text-zinc-400"><span>VRAM Usage</span><span>78%</span></div>
+                                    <div class="h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                        <div class="h-full bg-indigo-500 rounded-full" style="width: 78%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
+                            <div class="flex items-center gap-2 mb-4 px-1">
+                                <i data-lucide="server" class="w-5 h-5 text-emerald-400"></i>
+                                <h2 class="font-semibold text-sm text-zinc-300 uppercase tracking-wider">Active Models</h2>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="p-3 bg-zinc-900 rounded border border-zinc-800 flex justify-between items-center">
+                                    <span>codellama:7b</span>
+                                    <span class="text-xs bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded">Active</span>
+                                </div>
+                                <div class="p-3 bg-zinc-900 rounded border border-zinc-800 flex justify-between items-center text-zinc-500">
+                                    <span>llama3:8b</span>
+                                    <button class="text-xs hover:text-white transition-colors">Load</button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="lg:col-span-2 space-y-6">
+                        <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
+                            <div class="flex items-center gap-2 mb-4 px-1">
+                                <i data-lucide="code" class="w-5 h-5 text-amber-400"></i>
+                                <h2 class="font-semibold text-sm text-zinc-300 uppercase tracking-wider">Execution Logs</h2>
+                            </div>
+                            <div class="bg-zinc-900 rounded-lg border border-zinc-800 overflow-hidden">
+                                <div class="p-3 bg-zinc-800/50 flex items-center gap-2 text-xs font-mono text-zinc-400 border-b border-zinc-700">
+                                    <i data-lucide="terminal" class="w-4 h-4"></i> B-AILA_HISTORY.LOG
+                                </div>
+                                <div class="p-4 space-y-3 font-mono text-sm h-[400px] overflow-y-auto" id="log-container">
+                                    <div class="flex gap-3 text-[13px] text-zinc-400">
+                                        <span class="text-zinc-700 font-mono">[${new Date().toLocaleTimeString()}]</span>
+                                        <span>Handshake established with Blender Client.</span>
+                                    </div>
+                                    <div class="flex gap-3 text-[13px] text-zinc-400">
+                                        <span class="text-zinc-700 font-mono">[${new Date().toLocaleTimeString()}]</span>
+                                        <span>Generation job uuid-123 started (codellama).</span>
+                                    </div>
+                                    <div class="flex gap-3 text-[13px] text-emerald-400">
+                                        <span class="text-zinc-700 font-mono">[${new Date().toLocaleTimeString()}]</span>
+                                        <span>Model response received successfully.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            `,
+            manual: `
+                <div class="max-w-4xl mx-auto space-y-8 animate-in text-center">
+                    <div class="space-y-4 mb-12">
+                        <h2 class="text-4xl font-bold">Manual do Usuário</h2>
+                        <p class="text-zinc-400">Tudo o que você precisa saber para dominar o B-AILA.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                        <div class="p-6 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-zinc-800 rounded-lg"><i data-lucide="book-open" class="text-indigo-400 w-5 h-5"></i></div>
+                                <h3 class="text-lg font-semibold">Como Iniciar</h3>
+                            </div>
+                            <p class="text-sm text-zinc-400 leading-relaxed">Execute o script SETUP.bat e ative o Add-on no Blender seguindo as instruções de setup no painel JhonDev IA.</p>
+                        </div>
+                        <div class="p-6 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-zinc-800 rounded-lg"><i data-lucide="info" class="text-emerald-400 w-5 h-5"></i></div>
+                                <h3 class="text-lg font-semibold">Interação com IA</h3>
+                            </div>
+                            <p class="text-sm text-zinc-400 leading-relaxed">A IA recebe automaticamente o contexto da sua seleção no Blender para gerar comandos Python precisos e automatizar modelagem.</p>
+                        </div>
+                    </div>
+                </div>
+            `,
+            docs: `
+                <div class="max-w-5xl mx-auto animate-in">
+                    <div class="mb-8 text-center sm:text-left">
+                        <h2 class="text-2xl font-bold mb-2">Technical Documentation</h2>
+                        <p class="text-zinc-500 text-sm">Explore o funcionamento interno do ecossistema B-AILA.</p>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-indigo-500 transition-all">
+                            <h3 class="font-semibold text-zinc-100 mb-1">Architecture</h3>
+                            <p class="text-xs text-zinc-500">Technical design and local-first approach.</p>
+                        </div>
+                        <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-indigo-500 transition-all">
+                            <h3 class="font-semibold text-zinc-100 mb-1">API Protocol</h3>
+                            <p class="text-xs text-zinc-500">Communication between Blender and local server.</p>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        function showTab(tabId) {
+            document.getElementById('content').innerHTML = VIEWS[tabId];
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-zinc-800', 'text-white', 'shadow-sm');
+                btn.classList.add('text-zinc-500');
+            });
+            document.getElementById('btn-' + tabId).classList.add('bg-zinc-800', 'text-white', 'shadow-sm');
+            document.getElementById('btn-' + tabId).classList.remove('text-zinc-500');
+            lucide.createIcons();
+        }
+
+        // Initialize lucide
+        lucide.createIcons();
+        showTab('overview');
+    </script>
+</body>
+</html>
