@@ -118,7 +118,7 @@ class BAILA_OT_send_prompt(bpy.types.Operator):
             status = data.get("status")
 
             if status == "completed":
-                self.report({'INFO'}, "AI Response Received!")
+                print("B-AILA: AI Response Received!")
                 
                 chat_msg = data.get("data", {}).get("chat_message", "")
                 python_code = data.get("data", {}).get("python_code", "")
@@ -141,7 +141,8 @@ class BAILA_OT_send_prompt(bpy.types.Operator):
                 
                 return None # Stops the timer
             elif status == "failed":
-                self.report({'ERROR'}, "AI Generation Failed.")
+                props.ai_response = "AI: Generation Failed."
+                print("B-AILA: AI Generation Failed.")
                 return None # Stops the timer
             
         except Exception as e:
@@ -155,11 +156,11 @@ class BAILA_OT_send_prompt(bpy.types.Operator):
             # Create a localized namespace for execution
             exec_globals = {"bpy": bpy, "context": bpy.context}
             exec(code, exec_globals)
-            self.report({'INFO'}, "Code executed successfully.")
+            print("B-AILA: Code executed successfully.")
             # TODO: Report success to backend
         except Exception as e:
             error_msg = str(e)
-            self.report({'ERROR'}, f"Python Error: {error_msg}")
+            print(f"B-AILA Python Error: {error_msg}")
             self.report_error_to_backend(error_msg, code)
 
     def report_error_to_backend(self, error, code):
