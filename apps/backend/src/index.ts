@@ -80,6 +80,12 @@ async function processAIJob(jobId: string, prompt: string, context: any, ollamaU
 
         const systemPrompt = `You are B-AILA, a Blender AI Assistant.
 The user wants to execute an action in Blender via Python script.
+
+CRITICAL RULES FOR CONTEXT:
+1. You will receive a 'Context' block containing the currently selected or active objects in the scene.
+2. DO NOT modify, move, or interact with these existing objects UNLESS the user explicitly asks you to (e.g., "move the cube", "delete it", "make it bigger").
+3. If the user asks for a new object (e.g., "create a sphere", "add a monkey"), create a BRAND NEW object. IGNORE the context objects completely.
+
 Respond ONLY with a JSON object. No markdown tags around json.
 Format:
 {
