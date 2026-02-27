@@ -69,13 +69,18 @@ class VIEW3D_PT_baila_panel(bpy.types.Panel):
         layout.separator()
         layout.prop(props, "auto_run")
 
+import threading
+import time
+
 # --- Operators ---
 class BAILA_OT_send_prompt(bpy.types.Operator):
     bl_idname = "baila.send_prompt"
     bl_label = "Send Prompt"
     
-    _timer = None
     _job_id = None
+    _status = "idle"
+    _result_chat = ""
+    _result_code = ""
 
     def execute(self, context):
         props = context.scene.baila_props
@@ -85,72 +90,87 @@ class BAILA_OT_send_prompt(bpy.types.Operator):
             self.report({'WARNING'}, "Prompt cannot be empty!")
             return {'CANCELLED'}
         
-        # 1. Capture Scene Snaphot
+        # Capture Scene Snaphot
         snapshot = self.get_scene_snapshot()
         
-        # 2. Trigger Backend Handshake
         try:
-            payload = {
-                "prompt": prompt,
-                "context": snapshot
-            }
+            payload = {"prompt": prompt, "context": snapshot}
             response = requests.post(f"{props.api_url}/ai/generate", json=payload, timeout=5)
             data = response.json()
-            self._job_id = data.get("job_id")
+            BAILA_OT_send_prompt._job_id = data.get("job_id")
             
-            if self._job_id:
-                self.report({'INFO'}, f"Prompt sent! Job ID: {self._job_id}")
-                # 3. Start Polling Timer
-                bpy.app.timers.register(self.poll_job_status, first_interval=1.0)
+            if BAILA_OT_send_prompt._job_id:
+                print(f"B-AILA: Prompt sent! Job ID: {BAILA_OT_send_prompt._job_id}")
+                props.ai_response = "AI: Thinking..."
+                
+                # Start Polling Background Thread
+                BAILA_OT_send_prompt._status = "running"
+                thread = threading.Thread(target=self.poll_job_thread, args=(props.api_url, BAILA_OT_send_prompt._job_id))
+                thread.daemon = True
+                thread.start()
+                
+                # Register UI Sync Timer (runs purely in main thread to safely update UI)
+                bpy.app.timers.register(self.sync_ui_state, first_interval=1.0)
             
         except Exception as e:
-            self.report({'ERROR'}, f"Failed to connect to backend: {str(e)}")
+            print(f"B-AILA Failed to connect: {str(e)}")
+            props.ai_response = "AI: Backend offline."
             
         return {'FINISHED'}
 
-    def poll_job_status(self):
-        """Timer callback to check job status."""
-        # Note: In timer, context is restricted, get props directly from global data
-        try:
-            scene = bpy.data.scenes[0]
-            props = scene.baila_props
-            
-            response = requests.get(f"{props.api_url}/ai/status/{self._job_id}", timeout=2)
-            data = response.json()
-            status = data.get("status")
+    def poll_job_thread(self, api_url, job_id):
+        """Runs in background to fetch HTTP status without blocking or relying on Blender context."""
+        while BAILA_OT_send_prompt._status == "running":
+            time.sleep(1)
+            try:
+                response = requests.get(f"{api_url}/ai/status/{job_id}", timeout=2)
+                data = response.json()
+                status = data.get("status")
 
-            if status == "completed":
-                print("B-AILA: AI Response Received!")
+                if status == "completed":
+                    BAILA_OT_send_prompt._result_chat = data.get("data", {}).get("chat_message", "")
+                    BAILA_OT_send_prompt._result_code = data.get("data", {}).get("python_code", "")
+                    BAILA_OT_send_prompt._status = "completed"
+                    print(f"B-AILA: Job done. Response: {BAILA_OT_send_prompt._result_chat}")
+                    break
+                elif status == "failed":
+                    BAILA_OT_send_prompt._status = "failed"
+                    break
+            except Exception as e:
+                print(f"B-AILA Polling error: {e}")
+
+    def sync_ui_state(self):
+        """Runs safely in the main Blender thread to apply the thread's results to UI."""
+        status = BAILA_OT_send_prompt._status
+        if status == "running":
+            return 1.0 # keep checking
+        
+        # Thread finished doing its HTTP work
+        scene = bpy.data.scenes[0]
+        props = scene.baila_props
+        
+        if status == "completed":
+            chat = BAILA_OT_send_prompt._result_chat
+            code = BAILA_OT_send_prompt._result_code
+            
+            if chat:
+                props.ai_response = f"AI: {chat}"
+            elif code:
+                props.ai_response = "AI: Code generated."
                 
-                chat_msg = data.get("data", {}).get("chat_message", "")
-                python_code = data.get("data", {}).get("python_code", "")
+            if code and props.auto_run:
+                self.execute_ai_code(code)
                 
-                if chat_msg:
-                    props.ai_response = f"AI: {chat_msg}"
-                elif python_code:
-                    props.ai_response = "AI: Generated Python code successfully."
+        elif status == "failed":
+            props.ai_response = "AI: Generation failed."
+            
+        # Refresh UI globally
+        for screens in bpy.data.screens:
+            for area in screens.areas:
+                if area.type == 'VIEW_3D':
+                    area.tag_redraw()
                     
-                # Force UI to redraw safely from timer thread
-                for screens in bpy.data.screens:
-                    for area in screens.areas:
-                        if area.type == 'VIEW_3D':
-                            area.tag_redraw()
-
-                print(f"AI: {chat_msg}")
-
-                if python_code and props.auto_run:
-                    self.execute_ai_code(python_code)
-                
-                return None # Stops the timer
-            elif status == "failed":
-                props.ai_response = "AI: Generation Failed."
-                print("B-AILA: AI Generation Failed.")
-                return None # Stops the timer
-            
-        except Exception as e:
-            print(f"Polling error: {e}")
-            
-        return 1.0 # Run again in 1 second
+        return None # stop syncing
 
     def execute_ai_code(self, code):
         """Executes Python code with error reporting."""
