@@ -19,6 +19,11 @@ class BAILA_Properties(bpy.types.PropertyGroup):
         description="Type your command or question for the AI",
         default=""
     )
+    ai_response: bpy.props.StringProperty(
+        name="AI Response",
+        description="The latest response from the AI",
+        default="Waiting for your prompt..."
+    )
     auto_run: bpy.props.BoolProperty(
         name="Auto-Run Code",
         description="Automatically execute generated Python code",
@@ -41,11 +46,16 @@ class VIEW3D_PT_baila_panel(bpy.types.Panel):
         layout = self.layout
         props = context.scene.baila_props
 
-        # Chat History Placeholder (Simulated for now)
+        # Chat History
         col = layout.column(align=True)
         col.label(text="Chat History:")
         box = col.box()
-        box.label(text="AI: Waiting for your prompt...")
+        
+        # Split text into multiple lines if it's too long (simple wrap)
+        lines = props.ai_response.split('\n')
+        for line in lines:
+            if line.strip():
+                box.label(text=line)
 
         # User Input
         layout.separator()
@@ -112,7 +122,17 @@ class BAILA_OT_send_prompt(bpy.types.Operator):
                 chat_msg = data.get("data", {}).get("chat_message", "")
                 python_code = data.get("data", {}).get("python_code", "")
                 
-                # TODO: Display chat_msg in UI
+                if chat_msg:
+                    props.ai_response = f"AI: {chat_msg}"
+                elif python_code:
+                    props.ai_response = "AI: Generated Python code successfully."
+                    
+                # Force UI to redraw
+                for window in bpy.context.window_manager.windows:
+                    for area in window.screen.areas:
+                        if area.type == 'VIEW_3D':
+                            area.tag_redraw()
+
                 print(f"AI: {chat_msg}")
 
                 if python_code and props.auto_run:
