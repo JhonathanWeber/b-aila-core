@@ -119,7 +119,11 @@ Format:
                 system: systemPrompt,
                 prompt: prompt + (context ? `\nContext: ${JSON.stringify(context)}` : ""),
                 stream: false,
-                format: 'json'
+                format: 'json',
+                options: {
+                    num_predict: 4096,
+                    temperature: 0.1
+                }
             })
         });
 
