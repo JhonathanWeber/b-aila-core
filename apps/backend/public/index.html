@@ -95,9 +95,23 @@
                                 <h2 class="font-semibold text-sm text-zinc-300 uppercase tracking-wider">Model Management</h2>
                             </div>
                             
+                            <!-- Provider Settings -->
+                            <div class="mb-3 px-1 mt-2">
+                                <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Provider Settings</h3>
+                            </div>
+                            <div class="space-y-3 mb-6">
+                                <div class="p-3 bg-zinc-900 rounded border border-zinc-800 flex flex-col gap-2">
+                                    <label class="text-xs text-zinc-400">DeepSeek API Key</label>
+                                    <div class="flex gap-2">
+                                        <input type="password" id="deepseek-api-key" placeholder="sk-..." class="flex-1 bg-zinc-950 border border-zinc-800 rounded px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500">
+                                        <button onclick="saveProviderSettings()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded text-xs transition-colors shadow-sm">Save</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <!-- Installed Models -->
                             <div class="mb-3 px-1">
-                                <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Installed Models</h3>
+                                <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Installed & Cloud Models</h3>
                             </div>
                             <div class="space-y-2 mb-6" id="models-container">
                                 <div class="text-sm text-zinc-500 italic">Analyzing models...</div>
@@ -224,22 +238,41 @@
                 const recommendedContainer = document.getElementById('recommended-models-container');
                 
                 if (modelsContainer && modelsData.models) {
-                    const sortedInstalled = modelsData.models.sort((a, b) => b.isActive ? 1 : -1);
+                    
+                    // Inject active deepseek model if it is active but not returned by ollama
+                    const allModels = [...modelsData.models];
+                    if (modelsData.activeModel && modelsData.activeModel.startsWith('deepseek-') && !allModels.find(m => m.name === modelsData.activeModel)) {
+                        allModels.push({ name: modelsData.activeModel, size: 'Cloud', isActive: true });
+                    }
+
+                    const sortedInstalled = allModels.sort((a, b) => b.isActive ? 1 : -1);
                     modelsContainer.innerHTML = sortedInstalled.length === 0 
                         ? '<div class="text-sm text-zinc-500 italic">No models installed</div>'
-                        : sortedInstalled.map(m => `
+                        : sortedInstalled.map(m => {
+                            const isCloud = m.size === 'Cloud';
+                            return `
                         <div class="p-3 bg-zinc-900 rounded border ${m.isActive ? 'border-amber-500/50' : 'border-zinc-800'} flex justify-between items-center transition-all">
                             <div class="flex flex-col">
                                 <span class="text-sm ${m.isActive ? 'text-amber-400 font-semibold' : 'text-zinc-300'}">${m.name}</span>
-                                <span class="text-xs text-zinc-500">${m.size}</span>
+                                <span class="text-xs text-zinc-500">${isCloud ? '<i data-lucide="cloud" class="w-3 h-3 inline mr-1"></i>Cloud' : m.size}</span>
                             </div>
-                            <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2">
                                 ${m.isActive 
-                                    ? '<span class="text-xs bg-amber-500/10 text-amber-500 px-2 py-1 rounded font-medium border border-amber-500/20">Active</span>' 
+                                    ? '<span class="text-xs bg-amber-500/10 text-amber-500 px-2 py-1 rounded font-medium border border-amber-500/20 mr-1">Active</span>' 
                                     : `<button onclick="setActiveModel('${m.name}')" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded transition-colors cursor-pointer border border-zinc-700">Set Active</button>`}
+                                ${!isCloud ? `<button onclick="deleteModel('${m.name}')" class="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-500 px-2 py-1.5 rounded transition-colors cursor-pointer border border-red-500/20" title="Delete Model"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
                             </div>
                         </div>
-                    `).join('');
+                    `}).join('');
+                }
+
+                // Load Provider Settings
+                const settingsRes = await fetch('/api/settings');
+                if (settingsRes.ok) {
+                    const settingsData = await settingsRes.json();
+                    if (settingsData.deepseekApiKey) {
+                        document.getElementById('deepseek-api-key').value = settingsData.deepseekApiKey;
+                    }
                 }
 
                 // Append Recommended Models
@@ -247,6 +280,22 @@
                 let recommendedData = [];
                 if (recRes.ok) recommendedData = await recRes.json();
                 
+                // Inject DeepSeek Cloud Models
+                recommendedData.push({
+                    name: "deepseek-coder",
+                    size: "Cloud API",
+                    tier: "advanced",
+                    description: "DeepSeek Coder V2. Requires DeepSeek API Key.",
+                    tags: ["recommended", "coding", "reasoning"]
+                });
+                recommendedData.push({
+                    name: "deepseek-chat",
+                    size: "Cloud API",
+                    tier: "advanced",
+                    description: "DeepSeek V3 (Chat). Requires DeepSeek API Key.",
+                    tags: ["general"]
+                });
+
                 const pullStatusRes = await fetch('/api/models/pull/status');
                 let pullStatusData = {};
                 if (pullStatusRes.ok) pullStatusData = await pullStatusRes.json();

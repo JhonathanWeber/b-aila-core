@@ -4,6 +4,7 @@ import * as dotenv from 'dotenv';
 import path from 'path';
 import fastifyStatic from '@fastify/static';
 import * as os from 'os';
+import * as fs from 'fs';
 
 dotenv.config();
 
@@ -23,6 +24,22 @@ const prisma = new PrismaClient();
 let activeModelStr = "qwen2.5-coder:1.5b";
 let pullProgressState: Record<string, { status: string, total: number, completed: number, percent: number }> = {};
 let pendingCodeQueue: { id: string, code: string }[] = [];
+
+// --- Settings Management ---
+const settingsPath = path.join(__dirname, '../../settings.json');
+function loadSettings() {
+    try {
+        if (fs.existsSync(settingsPath)) {
+            const data = fs.readFileSync(settingsPath, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (e) { console.error("Error loading settings:", e); }
+    return { deepseekApiKey: '' };
+}
+
+function saveSettings(settings: any) {
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+}
 
 // --- Types ---
 interface GenerateRequest {
@@ -62,30 +79,11 @@ fastify.post('/ai/generate', async (request: any, reply: any) => {
 
 async function processAIJob(jobId: string, prompt: string, context: any, ollamaUrl: string) {
     try {
-        console.log(`[BACKEND] Fetching available models from Ollama...`);
-        const tagsResponse = await fetch(`${ollamaUrl}/api/tags`);
-        const tagsData = await tagsResponse.json();
-        const models = tagsData.models || [];
-
-        if (models.length === 0) {
-            throw new Error("No Ollama models installed. The setup script should have installed 'qwen2.5-coder:1.5b'.");
-        }
-
-        let modelName = models[0].name;
-
-        if (models.some((m: any) => m.name === activeModelStr)) {
-            modelName = activeModelStr;
-        } else {
-            console.log(`[BACKEND] Active model '${activeModelStr}' not found in Ollama. Falling back to '${modelName}'.`);
-        }
-
-        console.log(`[BACKEND] Using model: ${modelName}`);
-
-        const systemPrompt = `You are B-AILA, an advanced Blender Python AI Assistant.
+        const systemPrompt = `You are B - AILA, an advanced Blender Python AI Assistant.
 The user wants to execute an action in Blender via Python script.
 
 CRITICAL RULES FOR GEOMETRY CREATION:
-1. DO NOT rely blindly on simple GUI operators (e.g., \`bpy.ops.mesh.primitive_cube_add\`) if the requested object is complex.
+1. DO NOT rely blindly on simple GUI operators(e.g., \`bpy.ops.mesh.primitive_cube_add\`) if the requested object is complex.
 2. If the user asks for a complex object (like a "star", "staircase", "gear"), you MUST use procedural math to generate vertices/faces, and construct it using \`from_pydata\`.
 3. Example of procedural generation:
 \`\`\`python
@@ -109,26 +107,84 @@ Respond with a friendly message explaining what you did, and provide the python 
 # your code
 \`\`\`
 `;
+        // Wait and start processing
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log(`[BACKEND] Triggering generation for job ${jobId}...`);
 
-        const response = await fetch(`${ollamaUrl}/api/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: modelName,
-                system: systemPrompt,
-                prompt: prompt + (context ? `\nContext: ${JSON.stringify(context)}` : ""),
-                stream: false,
-                options: {
-                    num_predict: 4096,
+        let rawResponse = "";
+
+        if (activeModelStr.startsWith('deepseek-') && !activeModelStr.includes(':')) {
+            // --- DEEPSEEK CLOUD API ROUTE ---
+            console.log(`[BACKEND] Using Cloud Model: ${activeModelStr}`);
+            const settings = loadSettings();
+            if (!settings.deepseekApiKey) {
+                throw new Error("DeepSeek API Key is not configured. Please add it in Model Management.");
+            }
+
+            const res = await fetch('https://api.deepseek.com/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${settings.deepseekApiKey}`
+                },
+                body: JSON.stringify({
+                    model: activeModelStr,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: prompt }
+                    ],
+                    max_tokens: 4096,
                     temperature: 0.1
+                })
+            });
+
+            if (!res.ok) {
+                const err = await res.text();
+                throw new Error(`DeepSeek API error: ${err}`);
+            }
+
+            const json = await res.json() as any;
+            rawResponse = json.choices?.[0]?.message?.content || "";
+
+        } else {
+            // --- OLLAMA LOCAL API ROUTE ---
+            console.log(`[BACKEND] Using Local Model: ${activeModelStr}`);
+
+            // Check if model exists locally
+            const ollamaModelsRes = await fetch(`${ollamaUrl}/api/tags`);
+            if (ollamaModelsRes.ok) {
+                const ollamaModelsJson = await ollamaModelsRes.json() as any;
+                const availableModels = ollamaModelsJson.models || [];
+                const modelExists = availableModels.some((m: any) => m.name === activeModelStr || m.name === `${activeModelStr}:latest`);
+
+                if (!modelExists) {
+                    throw new Error(`Model ${activeModelStr} is not installed locally. Please download it first in Model Management.`);
                 }
-            })
-        });
+            }
 
-        const data = await response.json();
+            const res = await fetch(`${ollamaUrl}/api/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: activeModelStr,
+                    prompt: prompt + (context ? `\nContext: ${JSON.stringify(context)}` : ""),
+                    system: systemPrompt,
+                    stream: false,
+                    options: {
+                        num_predict: 4096,
+                        temperature: 0.1
+                    }
+                })
+            });
 
-        // Extract Python Code from Markdown Blocks
-        const rawResponse = data.response || "";
+            if (!res.ok) {
+                const err = await res.text();
+                throw new Error(`Ollama API error: ${err}`);
+            }
+
+            const json = await res.json() as any;
+            rawResponse = json.response || "";
+        }
         let pythonCode = "";
         const codeMatch = rawResponse.match(/\`\`\`python\n([\s\S]*?)\`\`\`/);
 
@@ -321,6 +377,49 @@ fastify.post('/api/settings/model', async (request: any, reply: any) => {
     activeModelStr = model;
     console.log(`[BACKEND] Active model set to: ${activeModelStr}`);
     return { success: true, activeModel: activeModelStr };
+});
+
+// Settings API: Get and Save User Settings (e.g. API Keys)
+fastify.get('/api/settings', async (request: any, reply: any) => {
+    return loadSettings();
+});
+
+fastify.post('/api/settings', async (request: any, reply: any) => {
+    const newSettings = request.body;
+    const current = loadSettings();
+    const updated = { ...current, ...newSettings };
+    saveSettings(updated);
+    return updated;
+});
+
+// Model Deletion API
+fastify.post('/api/models/delete', async (request: any, reply: any) => {
+    const { name } = request.body as { name: string };
+    if (!name) return reply.status(400).send({ error: 'Model name required' });
+
+    // DeepSeek models aren't installed locally
+    if (name.startsWith('deepseek-') && !name.includes(':')) {
+        return { success: true, message: 'Cloud model removed from view' };
+    }
+
+    const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
+    try {
+        const res = await fetch(`${ollamaUrl}/api/delete`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(`Ollama API error: ${err}`);
+        }
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to delete model:", error);
+        return reply.status(500).send({ error: error.message });
+    }
 });
 
 fastify.post('/api/models/pull', async (request: any, reply: any) => {
