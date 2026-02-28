@@ -103,12 +103,10 @@ CRITICAL RULES FOR CONTEXT:
 1. You will receive a 'Context' block containing the currently selected objects. DO NOT modify them UNLESS explicitly asked.
 2. If asked for a NEW object, build it and IGNORE the context objects.
 
-Respond ONLY with a JSON object. No markdown tags around json.
-Format:
-{
-  "chat_message": "Friendly explanation of what you did",
-  "python_code": "import bpy\\n# your complex procedural blender python code"
-}
+Respond with a friendly message explaining what you did, and provide the python code wrapped in markdown blocks like this:
+\`\`\`python
+# your code
+\`\`\`
 `;
 
         const response = await fetch(`${ollamaUrl}/api/generate`, {
@@ -119,7 +117,6 @@ Format:
                 system: systemPrompt,
                 prompt: prompt + (context ? `\nContext: ${JSON.stringify(context)}` : ""),
                 stream: false,
-                format: 'json',
                 options: {
                     num_predict: 4096,
                     temperature: 0.1
@@ -128,26 +125,31 @@ Format:
         });
 
         const data = await response.json();
-        let resultJson: any = {};
 
-        try {
-            resultJson = JSON.parse(data.response);
-        } catch (e) {
-            console.error("Failed to parse JSON from AI, attempting raw fallback.");
-            resultJson = { chat_message: "Here is the raw response", python_code: data.response };
+        // Extract Python Code from Markdown Blocks
+        const rawResponse = data.response || "";
+        let pythonCode = "";
+        const codeMatch = rawResponse.match(/\`\`\`python\n([\s\S]*?)\`\`\`/);
+
+        if (codeMatch && codeMatch[1]) {
+            pythonCode = codeMatch[1];
+        } else {
+            console.error("Failed to extract python block from markdown, attempting raw fallback.");
+            pythonCode = rawResponse;
         }
+
+        // Clean any residual tokens
+        pythonCode = pythonCode
+            .replace(/<\|.*?\|>/g, "\n")
+            .replace(/<｜.*?｜>/g, "\n")
+            .replace(/｜/g, "\n");
 
         await prisma.aIJob.update({
             where: { id: jobId },
             data: {
                 status: 'completed',
-                response: resultJson.chat_message || "Finished.",
-                pythonCode: (resultJson.python_code || data.response || "")
-                    .replace(/```python\n?/g, "") // remove opening markdown
-                    .replace(/```\n?/g, "") // remove closing markdown
-                    .replace(/<\|.*?\|>/g, "\n") // remove AI tokens but keep separation
-                    .replace(/<｜.*?｜>/g, "\n") // remove weird unicode variations
-                    .replace(/｜/g, "\n") // remove generic pipe hallucination
+                response: "Procedural geometry script generated.",
+                pythonCode: pythonCode
             }
         });
         console.log(`[BACKEND] Job ${jobId} completed successfully.`);
