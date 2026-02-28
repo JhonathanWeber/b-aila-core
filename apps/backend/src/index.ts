@@ -145,9 +145,9 @@ Format:
                 pythonCode: (resultJson.python_code || data.response || "")
                     .replace(/```python\n?/g, "") // remove opening markdown
                     .replace(/```\n?/g, "") // remove closing markdown
-                    .replace(/<\|.*?\|>/g, "") // remove AI tokens
-                    .replace(/<｜.*?｜>/g, "") // remove weird unicode variations
-                    .replace(/｜/g, "") // remove generic pipe hallucination
+                    .replace(/<\|.*?\|>/g, "\n") // remove AI tokens but keep separation
+                    .replace(/<｜.*?｜>/g, "\n") // remove weird unicode variations
+                    .replace(/｜/g, "\n") // remove generic pipe hallucination
             }
         });
         console.log(`[BACKEND] Job ${jobId} completed successfully.`);
