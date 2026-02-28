@@ -262,21 +262,35 @@
                             const isPulling = pullStatusData[r.name] && pullStatusData[r.name].status !== 'success' && pullStatusData[r.name].status !== 'failed';
                             const pct = isPulling ? pullStatusData[r.name].percent : 0;
                             const statusText = isPulling ? pullStatusData[r.name].status : '';
+
+                            const tierColors = {
+                                lightweight: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+                                medium:      'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+                                advanced:    'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
+                            };
+                            const tierLabels = {
+                                lightweight: 'Lightweight',
+                                medium:      'Medium',
+                                advanced:    'Advanced',
+                            };
+                            const tierBadge = r.tier ? `<span class="px-1.5 py-0.5 rounded text-[10px] border uppercase tracking-wider ${tierColors[r.tier] || 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30'}">${tierLabels[r.tier] || r.tier}</span>` : '';
+                            const topPickBadge = r.tags && r.tags.includes('recommended') ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">⭐ Top Pick</span>' : '';
                             
                             return `
                             <div class="p-3 bg-zinc-900/50 rounded border border-zinc-800 flex flex-col gap-3">
                                 <div class="flex justify-between items-start">
-                                    <div class="flex flex-col">
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-sm font-medium text-emerald-400">${r.name}</span>
-                                            ${r.tags && r.tags.includes('recommended') ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">Top Pick</span>' : ''}
+                                    <div class="flex flex-col gap-1">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="text-sm font-medium text-zinc-100">${r.name}</span>
+                                            ${tierBadge}
+                                            ${topPickBadge}
                                         </div>
-                                        <span class="text-xs text-zinc-400 mt-0.5">${r.description}</span>
-                                        <span class="text-xs text-zinc-500 mt-1"><i data-lucide="hard-drive" class="w-3 h-3 inline mr-1"></i>${r.size}</span>
+                                        <span class="text-xs text-zinc-400">${r.description}</span>
+                                        <span class="text-xs text-zinc-500"><i data-lucide="hard-drive" class="w-3 h-3 inline mr-1"></i>${r.size}</span>
                                     </div>
                                     ${isPulling 
-                                        ? `<div class="text-xs font-medium text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20 w-20 text-center">${pct}%</div>` 
-                                        : `<button onclick="pullModel('${r.name}')" class="text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded transition-colors cursor-pointer shadow-sm"><i data-lucide="download" class="w-3 h-3 inline mr-1"></i>Download</button>`
+                                        ? `<div class="text-xs font-medium text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20 w-20 text-center shrink-0">${pct}%</div>` 
+                                        : `<button onclick="pullModel('${r.name}')" class="text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded transition-colors cursor-pointer shadow-sm shrink-0"><i data-lucide="download" class="w-3 h-3 inline mr-1"></i>Download</button>`
                                     }
                                 </div>
                                 ${isPulling ? `

@@ -219,9 +219,17 @@ fastify.get('/api/models', async (request: any, reply: any) => {
 // Advanced Model Management Endpoints
 fastify.get('/api/models/recommended', async (request: any, reply: any) => {
     return [
-        { name: "qwen2.5-coder:1.5b", size: "936MB", description: "Fast & lightweight. Great default for basic queries.", tags: ["recommended", "fast"] },
-        { name: "qwen2.5-coder:7b", size: "4.7GB", description: "Highly capable coder. Excellent Python script generation.", tags: ["pro", "accurate"] },
-        { name: "deepseek-coder:6.7b", size: "3.8GB", description: "Strong alternative coder model.", tags: ["pro"] }
+        // --- LIGHTWEIGHT ---
+        { name: "qwen2.5-coder:1.5b", size: "936MB", tier: "lightweight", description: "Ultra-fast & lightweight. Great default for basic object creation.", tags: ["recommended", "fast"] },
+        { name: "phi3.5:3.8b", size: "2.2GB", tier: "lightweight", description: "Microsoft Phi-3.5. Efficient and surprisingly capable for small scripts.", tags: ["fast"] },
+        // --- MEDIUM ---
+        { name: "qwen2.5-coder:7b", size: "4.7GB", tier: "medium", description: "Best balance of speed and quality. Excellent Python & BMesh generation.", tags: ["recommended", "pro"] },
+        { name: "deepseek-coder:6.7b", size: "3.8GB", tier: "medium", description: "Strong alternative coder. Very good for logical & algorithmic tasks.", tags: ["pro"] },
+        { name: "codellama:7b", size: "3.8GB", tier: "medium", description: "Meta CodeLlama. Reliable Python expert, good for structured code.", tags: ["pro"] },
+        { name: "granite-code:8b", size: "4.6GB", tier: "medium", description: "IBM Granite. Optimized for code generation and structured patterns.", tags: ["pro"] },
+        // --- ADVANCED ---
+        { name: "qwen2.5-coder:14b", size: "9.0GB", tier: "advanced", description: "Qwen 14B. Near GPT-4 code quality. Excels at complex 3D geometry scripts.", tags: ["advanced", "pro"] },
+        { name: "deepseek-coder:33b", size: "19GB", tier: "advanced", description: "DeepSeek 33B. Extremely capable at advanced procedural math and geometry.", tags: ["advanced", "pro"] },
     ];
 });
 
