@@ -22,6 +22,7 @@ const prisma = new PrismaClient();
 // --- Global State ---
 let activeModelStr = "qwen2.5-coder:1.5b";
 let pullProgressState: Record<string, { status: string, total: number, completed: number, percent: number }> = {};
+let pendingCodeQueue: { id: string, code: string }[] = [];
 
 // --- Types ---
 interface GenerateRequest {
@@ -244,10 +245,26 @@ fastify.post('/api/chat/message', async (request: any, reply: any) => {
                     code: completedJob.pythonCode
                 }
             });
+
+            // Queue the python code for the Blender add-on to pick up
+            if (completedJob.pythonCode) {
+                pendingCodeQueue.push({ id: completedJob.id, code: completedJob.pythonCode });
+            }
         }
     }).catch(console.error);
 
     return { jobId: job.id, status: 'processing' };
+});
+
+// Bridge: Blender execution endpoints
+fastify.get('/api/blender/pending-code', async (request: any, reply: any) => {
+    return { pending: pendingCodeQueue };
+});
+
+fastify.post('/api/blender/mark-executed', async (request: any, reply: any) => {
+    const { id } = request.body as { id: string };
+    pendingCodeQueue = pendingCodeQueue.filter(item => item.id !== id);
+    return { success: true };
 });
 
 // Dashboard API: Get Recent Jobs

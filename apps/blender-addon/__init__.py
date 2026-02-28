@@ -274,6 +274,40 @@ class BAILA_OT_open_chat(bpy.types.Operator):
         
         return {'FINISHED'}
 
+# --- Background Poller for Web Chat Execution ---
+def poll_pending_code():
+    """Polls the backend for code generated via the Web Chat and executes it."""
+    try:
+        if not bpy.context or not bpy.context.scene:
+            return 1.0
+            
+        props = bpy.context.scene.baila_props
+        if not props.auto_run:
+            return 1.0  # skip if auto-run is disabled
+            
+        response = requests.get(f"{props.api_url}/api/blender/pending-code", timeout=1)
+        if response.status_code == 200:
+            data = response.json()
+            pending = data.get("pending", [])
+            for item in pending:
+                code_id = item.get("id")
+                code_str = item.get("code")
+                
+                if code_str:
+                    print(f"B-AILA: Executing code from Web Chat (Job {code_id})")
+                    BAILA_OT_send_prompt.execute_ai_code(code_str)
+                    
+                    # Mark as executed so we don't run it again
+                    requests.post(
+                        f"{props.api_url}/api/blender/mark-executed", 
+                        json={"id": code_id}, 
+                        timeout=1
+                    )
+    except Exception:
+        pass # Ignore connection refused when backend is offline
+        
+    return 1.0 # Run again in 1 second
+
 # --- Registration ---
 classes = (
     BAILA_Properties,
@@ -286,11 +320,19 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
     bpy.types.Scene.baila_props = bpy.props.PointerProperty(type=BAILA_Properties)
+    
+    # Start the polling daemon
+    if not bpy.app.timers.is_registered(poll_pending_code):
+        bpy.app.timers.register(poll_pending_code)
 
 def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
     del bpy.types.Scene.baila_props
+    
+    # Stop the polling daemon
+    if bpy.app.timers.is_registered(poll_pending_code):
+        bpy.app.timers.unregister(poll_pending_code)
 
 if __name__ == "__main__":
     register()
