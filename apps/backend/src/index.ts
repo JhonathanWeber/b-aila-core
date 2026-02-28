@@ -347,7 +347,7 @@ fastify.get('/api/models', async (request: any, reply: any) => {
             isActive: m.name === activeModelStr
         }));
 
-        return { status: 'ok', models };
+        return { status: 'ok', models, activeModel: activeModelStr };
     } catch (e) {
         return { status: 'error', error: "Could not connect to Ollama", models: [] };
     }
