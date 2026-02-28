@@ -1,6 +1,9 @@
 import bpy
 import requests
 import json
+import webbrowser
+import subprocess
+import os
 
 bl_info = {
     "name": "B-AILA (Blender AI Local Assistant)",
@@ -57,13 +60,27 @@ class VIEW3D_PT_baila_panel(bpy.types.Panel):
             if line.strip():
                 box.label(text=line)
 
+        # Open Chat Window
+        row = layout.row()
+        row.operator("baila.open_chat", text="Open Chat", icon='WINDOW')
+
+        layout.separator()
+
+        # Chat History (last response preview)
+        col = layout.column(align=True)
+        box = col.box()
+        lines = props.ai_response.split('\n')
+        for line in lines[:8]:  # show up to 8 lines
+            if line.strip():
+                box.label(text=line[:60])  # truncate long lines
+
         # User Input
         layout.separator()
         layout.prop(props, "user_prompt")
         
         # Action Buttons
         row = layout.row()
-        row.operator("baila.send_prompt", text="Send to AI", icon='CONSOLE')
+        row.operator("baila.send_prompt", text="Send", icon='PLAY')
         
         # Settings
         layout.separator()
@@ -218,11 +235,51 @@ class BAILA_OT_send_prompt(bpy.types.Operator):
             "unit_system": bpy.context.scene.unit_settings.system
         }
 
+# --- Open Chat Window Operator ---
+class BAILA_OT_open_chat(bpy.types.Operator):
+    bl_idname = "baila.open_chat"
+    bl_label = "Open Chat"
+    bl_description = "Open B-AILA Chat in a browser window"
+
+    def execute(self, context):
+        props = context.scene.baila_props
+        chat_url = f"{props.api_url}/chat"
+        
+        # Try Chrome or Edge in --app mode for floating window experience
+        chrome_paths = [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        ]
+        
+        opened = False
+        for chrome_exe in chrome_paths:
+            if os.path.exists(chrome_exe):
+                try:
+                    subprocess.Popen([
+                        chrome_exe,
+                        f"--app={chat_url}",
+                        "--window-size=420,700",
+                        "--window-position=0,0"
+                    ])
+                    opened = True
+                    break
+                except Exception:
+                    pass
+        
+        if not opened:
+            # Fallback to default browser
+            webbrowser.open(chat_url)
+        
+        return {'FINISHED'}
+
 # --- Registration ---
 classes = (
     BAILA_Properties,
     VIEW3D_PT_baila_panel,
     BAILA_OT_send_prompt,
+    BAILA_OT_open_chat,
 )
 
 def register():

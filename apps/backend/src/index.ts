@@ -187,6 +187,69 @@ fastify.get('/ai/status/:id', async (request: any, reply: any) => {
     };
 });
 
+// Serve Chat Page
+fastify.get('/chat', async (request: any, reply: any) => {
+    const fs = await import('fs');
+    const chatPath = path.join(__dirname, '../public/chat.html');
+    const html = fs.readFileSync(chatPath, 'utf8');
+    reply.type('text/html').send(html);
+});
+
+// Chat Session Management
+fastify.post('/api/chat/session', async (request: any, reply: any) => {
+    const { title } = request.body as { title?: string };
+    const session = await prisma.chatSession.create({
+        data: { title: title || 'B-AILA Session' }
+    });
+    return session;
+});
+
+fastify.get('/api/chat/session/:id/messages', async (request: any, reply: any) => {
+    const { id } = request.params as { id: string };
+    const session = await prisma.chatSession.findUnique({ where: { id } });
+    if (!session) return reply.status(404).send({ error: 'Session not found' });
+
+    const messages = await prisma.chatMessage.findMany({
+        where: { sessionId: id },
+        orderBy: { createdAt: 'asc' }
+    });
+    return messages;
+});
+
+fastify.post('/api/chat/message', async (request: any, reply: any) => {
+    const { sessionId, content } = request.body as { sessionId: string; content: string };
+    const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
+
+    if (!sessionId || !content) return reply.status(400).send({ error: 'sessionId and content required' });
+
+    // Save the user message
+    await prisma.chatMessage.create({
+        data: { sessionId, role: 'user', content }
+    });
+
+    // Create an AI job and start processing
+    const job = await prisma.aIJob.create({
+        data: { status: 'processing', prompt: content }
+    });
+
+    processAIJob(job.id, content, null, ollamaUrl).then(async () => {
+        // After job completes, save the AI response as a chat message
+        const completedJob = await prisma.aIJob.findUnique({ where: { id: job.id } });
+        if (completedJob && completedJob.status === 'completed') {
+            await prisma.chatMessage.create({
+                data: {
+                    sessionId,
+                    role: 'ai',
+                    content: completedJob.response || 'Done!',
+                    code: completedJob.pythonCode
+                }
+            });
+        }
+    }).catch(console.error);
+
+    return { jobId: job.id, status: 'processing' };
+});
+
 // Dashboard API: Get Recent Jobs
 fastify.get('/api/jobs', async (request: any, reply: any) => {
     const jobs = await prisma.aIJob.findMany({
@@ -195,6 +258,7 @@ fastify.get('/api/jobs', async (request: any, reply: any) => {
     });
     return jobs;
 });
+
 
 // Dashboard API: Get Available Models
 fastify.get('/api/models', async (request: any, reply: any) => {

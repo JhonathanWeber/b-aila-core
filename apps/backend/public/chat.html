@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B-AILA Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #09090b;
+            color: #e4e4e7;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: #111113;
+            border-bottom: 1px solid #27272a;
+            flex-shrink: 0;
+            -webkit-app-region: drag;
+        }
+        .header-logo {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .header-title { font-size: 14px; font-weight: 600; color: #f4f4f5; }
+        .header-sub { font-size: 11px; color: #71717a; }
+        .header-status {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #71717a;
+        }
+        .status-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+        /* Chat Area */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            scroll-behavior: smooth;
+        }
+        .chat-area::-webkit-scrollbar { width: 4px; }
+        .chat-area::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
+
+        /* Messages */
+        .msg {
+            display: flex;
+            flex-direction: column;
+            max-width: 85%;
+            animation: fadeIn 0.2s ease-out;
+        }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+        .msg.user { align-self: flex-end; align-items: flex-end; }
+        .msg.ai { align-self: flex-start; align-items: flex-start; }
+
+        .bubble {
+            padding: 10px 14px;
+            border-radius: 16px;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .msg.user .bubble {
+            background: #4f46e5;
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .msg.ai .bubble {
+            background: #18181b;
+            border: 1px solid #27272a;
+            color: #d4d4d8;
+            border-bottom-left-radius: 4px;
+        }
+        .msg-time {
+            font-size: 10px;
+            color: #52525b;
+            margin-top: 4px;
+            padding: 0 4px;
+        }
+
+        /* Code Block */
+        .code-block {
+            margin-top: 8px;
+            background: #0d0d0f;
+            border: 1px solid #27272a;
+            border-radius: 8px;
+            overflow: hidden;
+            font-size: 12px;
+            width: 100%;
+            max-width: 100%;
+        }
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 12px;
+            background: #18181b;
+            border-bottom: 1px solid #27272a;
+        }
+        .code-lang { font-size: 11px; color: #71717a; font-family: monospace; }
+        .copy-btn {
+            background: none;
+            border: none;
+            color: #71717a;
+            cursor: pointer;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: color 0.2s, background 0.2s;
+        }
+        .copy-btn:hover { color: #a1a1aa; background: #27272a; }
+        .copy-btn.copied { color: #22c55e; }
+        pre {
+            padding: 12px;
+            overflow-x: auto;
+            color: #a5f3fc;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            line-height: 1.5;
+        }
+        pre::-webkit-scrollbar { height: 4px; }
+        pre::-webkit-scrollbar-thumb { background: #3f3f46; }
+
+        /* Typing Indicator */
+        .typing { display: flex; align-items: center; gap: 4px; padding: 8px 14px; }
+        .dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #6366f1;
+            animation: bounce 1.2s infinite;
+        }
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+        /* Input Area */
+        .input-area {
+            padding: 12px 16px;
+            background: #111113;
+            border-top: 1px solid #27272a;
+            flex-shrink: 0;
+        }
+        .input-wrapper {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 12px;
+            padding: 8px 12px;
+            transition: border-color 0.2s;
+        }
+        .input-wrapper:focus-within { border-color: #4f46e5; }
+        textarea {
+            flex: 1;
+            background: none;
+            border: none;
+            outline: none;
+            color: #e4e4e7;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            line-height: 1.5;
+            resize: none;
+            min-height: 22px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        textarea::placeholder { color: #52525b; }
+        textarea::-webkit-scrollbar { width: 3px; }
+
+        .send-btn {
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            background: #4f46e5;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, transform 0.1s;
+            flex-shrink: 0;
+        }
+        .send-btn:hover { background: #4338ca; }
+        .send-btn:active { transform: scale(0.95); }
+        .send-btn:disabled { background: #27272a; cursor: not-allowed; opacity: 0.5; }
+        .send-btn svg { width: 14px; height: 14px; color: white; stroke: white; }
+
+        .input-hint {
+            font-size: 10px;
+            color: #3f3f46;
+            margin-top: 6px;
+            text-align: right;
+        }
+
+        /* Empty State */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: #52525b;
+        }
+        .empty-icon {
+            width: 48px; height: 48px;
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+        .empty-title { font-size: 14px; font-weight: 500; color: #71717a; }
+        .empty-sub { font-size: 12px; text-align: center; max-width: 220px; line-height: 1.5; }
+
+        /* Suggestions */
+        .suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+            margin-top: 8px;
+        }
+        .suggestion-chip {
+            padding: 5px 10px;
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 20px;
+            font-size: 11px;
+            color: #a1a1aa;
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .suggestion-chip:hover { border-color: #4f46e5; color: #e4e4e7; }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <div class="header-logo">🤖</div>
+    <div>
+        <div class="header-title">B-AILA Chat</div>
+        <div class="header-sub">Blender AI Local Assistant</div>
+    </div>
+    <div class="header-status">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Connected</span>
+    </div>
+</div>
+
+<!-- Chat Area -->
+<div class="chat-area" id="chat-area">
+    <!-- Empty state shown until messages load -->
+    <div class="empty-state" id="empty-state">
+        <div class="empty-icon">✨</div>
+        <div class="empty-title">What do you want to build?</div>
+        <div class="empty-sub">Describe an object, action or scene — B-AILA will script it in Blender for you.</div>
+        <div class="suggestions">
+            <span class="suggestion-chip" onclick="sendSuggestion('Create a 5-point star')">⭐ 5-point star</span>
+            <span class="suggestion-chip" onclick="sendSuggestion('Create a spiral staircase with 15 steps')">🌀 Spiral staircase</span>
+            <span class="suggestion-chip" onclick="sendSuggestion('Add a cube at position 2,0,0')">🟦 Add a cube</span>
+            <span class="suggestion-chip" onclick="sendSuggestion('Create a gear with 12 teeth')">⚙️ Gear</span>
+        </div>
+    </div>
+</div>
+
+<!-- Input Area -->
+<div class="input-area">
+    <div class="input-wrapper">
+        <textarea id="chat-input" placeholder="Describe what you want to build..." rows="1" autofocus></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/>
+            </svg>
+        </button>
+    </div>
+    <div class="input-hint">Enter ↵ to send &nbsp;·&nbsp; Shift+Enter for new line</div>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:8990';
+    const SESSION_KEY = 'baila_session_id';
+    
+    let sessionId = localStorage.getItem(SESSION_KEY);
+    let isTyping = false;
+
+    // --- Auto-resize textarea ---
+    const textarea = document.getElementById('chat-input');
+    textarea.addEventListener('input', () => {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    });
+
+    // --- Enter to send ---
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    // --- Initialization ---
+    async function init() {
+        if (!sessionId) {
+            // Create new session
+            const res = await fetch(`${API_URL}/api/chat/session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: 'B-AILA Session' })
+            });
+            const data = await res.json();
+            sessionId = data.id;
+            localStorage.setItem(SESSION_KEY, sessionId);
+        } else {
+            // Load existing messages
+            await loadHistory();
+        }
+    }
+
+    async function loadHistory() {
+        try {
+            const res = await fetch(`${API_URL}/api/chat/session/${sessionId}/messages`);
+            if (!res.ok) {
+                // Session might have been deleted, create a new one
+                localStorage.removeItem(SESSION_KEY);
+                sessionId = null;
+                await init();
+                return;
+            }
+            const messages = await res.json();
+            if (messages.length > 0) {
+                document.getElementById('empty-state').style.display = 'none';
+                for (const msg of messages) {
+                    appendBubble(msg.role, msg.content, msg.code, new Date(msg.createdAt).toLocaleTimeString(), false);
+                }
+                scrollToBottom();
+            }
+        } catch(e) {
+            console.error('Failed to load history:', e);
+        }
+    }
+
+    // --- Send Message ---
+    async function sendMessage() {
+        const input = textarea.value.trim();
+        if (!input || isTyping) return;
+
+        textarea.value = '';
+        textarea.style.height = 'auto';
+
+        hideEmptyState();
+        appendBubble('user', input);
+        showTyping();
+        setButtonDisabled(true);
+
+        try {
+            const res = await fetch(`${API_URL}/api/chat/message`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId, content: input })
+            });
+            const data = await res.json();
+
+            // Poll for AI job completion
+            await pollJob(data.jobId);
+        } catch(e) {
+            hideTyping();
+            appendBubble('ai', '⚠️ Failed to reach the backend. Make sure the server is running.');
+            setButtonDisabled(false);
+        }
+    }
+
+    async function pollJob(jobId) {
+        let attempts = 0;
+        const maxAttempts = 60; // 60 * 2s = 2 min timeout
+        
+        while (attempts < maxAttempts) {
+            await sleep(2000);
+            try {
+                const res = await fetch(`${API_URL}/ai/status/${jobId}`);
+                const data = await res.json();
+                
+                if (data.status === 'completed') {
+                    hideTyping();
+                    const msg = data.data?.chat_message || 'Done!';
+                    const code = data.data?.python_code || null;
+                    appendBubble('ai', msg, code);
+                    setButtonDisabled(false);
+                    return;
+                } else if (data.status === 'failed') {
+                    hideTyping();
+                    appendBubble('ai', `❌ Error: ${data.data?.error || 'Unknown error'}`);
+                    setButtonDisabled(false);
+                    return;
+                }
+            } catch(e) { /* keep polling */ }
+            attempts++;
+        }
+        
+        hideTyping();
+        appendBubble('ai', '⏱️ Request timed out. Try again.');
+        setButtonDisabled(false);
+    }
+
+    function sendSuggestion(text) {
+        textarea.value = text;
+        sendMessage();
+    }
+
+    // --- DOM Helpers ---
+    function appendBubble(role, text, code = null, time = null, doScroll = true) {
+        const chatArea = document.getElementById('chat-area');
+        const timeStr = time || new Date().toLocaleTimeString();
+        
+        const msgEl = document.createElement('div');
+        msgEl.className = `msg ${role}`;
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = text;
+        msgEl.appendChild(bubble);
+        
+        if (code && code.trim()) {
+            const codeBlock = document.createElement('div');
+            codeBlock.className = 'code-block';
+            codeBlock.innerHTML = `
+                <div class="code-header">
+                    <span class="code-lang">🐍 python</span>
+                    <button class="copy-btn" onclick="copyCode(this)">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        Copy
+                    </button>
+                </div>
+                <pre>${escapeHtml(code)}</pre>`;
+            msgEl.appendChild(codeBlock);
+        }
+
+        const timeEl = document.createElement('div');
+        timeEl.className = 'msg-time';
+        timeEl.textContent = timeStr;
+        msgEl.appendChild(timeEl);
+
+        chatArea.appendChild(msgEl);
+        if (doScroll) scrollToBottom();
+    }
+
+    function showTyping() {
+        isTyping = true;
+        const chatArea = document.getElementById('chat-area');
+        const typingEl = document.createElement('div');
+        typingEl.className = 'msg ai';
+        typingEl.id = 'typing-indicator';
+        typingEl.innerHTML = `<div class="bubble"><div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>`;
+        chatArea.appendChild(typingEl);
+        scrollToBottom();
+    }
+
+    function hideTyping() {
+        isTyping = false;
+        const el = document.getElementById('typing-indicator');
+        if (el) el.remove();
+    }
+
+    function hideEmptyState() {
+        const el = document.getElementById('empty-state');
+        if (el) el.style.display = 'none';
+    }
+
+    function scrollToBottom() {
+        const chatArea = document.getElementById('chat-area');
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    function setButtonDisabled(disabled) {
+        document.getElementById('send-btn').disabled = disabled;
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    async function copyCode(btn) {
+        const code = btn.closest('.code-block').querySelector('pre').textContent;
+        await navigator.clipboard.writeText(code);
+        btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
+        btn.className = 'copy-btn copied';
+        setTimeout(() => {
+            btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy`;
+            btn.className = 'copy-btn';
+        }, 2000);
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // Check backend connection
+    async function checkConnection() {
+        try {
+            await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(3000) });
+        } catch {
+            document.getElementById('status-dot').style.background = '#ef4444';
+            document.getElementById('status-dot').style.boxShadow = '0 0 6px rgba(239,68,68,0.5)';
+            document.getElementById('status-text').textContent = 'Backend offline';
+        }
+    }
+
+    init();
+    checkConnection();
+</script>
+</body>
+</html>
