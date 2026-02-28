@@ -55,11 +55,6 @@ fastify.get('/health', async (request: any, reply: any) => {
     return { status: 'ok', service: 'B-AILA Backend' };
 });
 
-// Chat Page Route
-fastify.get('/chat', async (request: any, reply: any) => {
-    return reply.sendFile('chat.html');
-});
-
 // AI Generation Trigger (Handshake)
 fastify.post('/ai/generate', async (request: any, reply: any) => {
     const { prompt, context, sessionId } = request.body as GenerateRequest;
