@@ -89,7 +89,7 @@ CRITICAL RULES FOR GEOMETRY CREATION:
 3. Example of procedural generation:
 \`\`\`python
 import bpy, math
-vertices = [(0,0,0), (1,0,0), (0,1,0)] # Calculate these mathematically!
+vertices = [(0,0,0), (1,0,0), (0,1,0)]
 edges = []
 faces = [(0, 1, 2)]
 mesh = bpy.data.meshes.new("GeneratedMesh")
